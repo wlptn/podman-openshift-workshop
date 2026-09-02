@@ -1,0 +1,14 @@
+# A stable in-cluster DNS name ("redis") + IP for the redis pods.
+# The web app's start.sh looks up this exact name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

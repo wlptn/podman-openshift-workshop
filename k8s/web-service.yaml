@@ -1,0 +1,14 @@
+# Stable in-cluster address for the web pods; the Route points here.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  selector:
+    app: web
+  ports:
+    - name: 5000-tcp
+      port: 5000
+      targetPort: 5000

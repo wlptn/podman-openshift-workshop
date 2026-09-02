@@ -1,0 +1,33 @@
+# The Flask web app. It is STATELESS -> safe to scale to many replicas;
+# all replicas share the one redis, so the counter stays consistent.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          # IMAGE SOURCE: `oc new-app ... --strategy=docker` builds this image
+          # in-cluster and stores it as the "web" ImageStream. Point this at it:
+          #   image-registry.openshift-image-registry.svc:5000/<YOUR-NAMESPACE>/web:latest
+          # (or any registry both environments can reach). Replace <YOUR-NAMESPACE>.
+          image: image-registry.openshift-image-registry.svc:5000/REPLACE-NAMESPACE/web:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:          # keeps un-ready pods out of the Service
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10

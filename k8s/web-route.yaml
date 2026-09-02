@@ -1,0 +1,17 @@
+# The public front door. edge = TLS terminated at the router (https),
+# Redirect = bounce http -> https so both work.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: web
+  labels:
+    app: web
+spec:
+  to:
+    kind: Service
+    name: web
+  port:
+    targetPort: 5000-tcp
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

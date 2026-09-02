@@ -1,0 +1,23 @@
+# Redis: the app's backing service (stores the page hit counter).
+# Deploy this FIRST so the "redis" Service name resolves when web starts.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:alpine        # public image, pulls fine on OpenShift
+          ports:
+            - containerPort: 6379
