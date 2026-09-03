@@ -1,0 +1,729 @@
+<title>Podman to OpenShift Lab</title>
+<meta name="description" content="Hands-on lab: build and run a container with Podman, then deploy the same app to OpenShift and scale it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;900&family=Red+Hat+Text:wght@400;500;700&family=Red+Hat+Mono:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#f4f4f4; --surface:#ffffff; --surface-2:#ececec; --surface-3:#e0e0e0;
+    --ink:#151515; --ink-2:#4d4d4d; --ink-3:#6e6e6e;
+    --border:#d6d6d6; --border-2:#bcbcbc;
+    --podman:#4d4d4d; --podman-soft:#e8e8e8;
+    --openshift:#ee0000; --openshift-soft:#fce3e3;
+    --ok:#3e8635; --ok-soft:#e7f2e5;
+    --warn:#b58100; --warn-soft:#f9efd4;
+    --code-bg:#151515; --code-ink:#e6e6e6; --code-dim:#9b9b9b; --code-line:#2e2e2e;
+    --link:#c40000;
+    --shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px -12px rgba(0,0,0,.22);
+    --radius:14px;
+  }
+  :root:not([data-theme="light"]){ @media (prefers-color-scheme:dark){
+    --bg:#0f0f0f; --surface:#1a1a1a; --surface-2:#242424; --surface-3:#2f2f2f;
+    --ink:#f0f0f0; --ink-2:#b8b8b8; --ink-3:#8a8a8a;
+    --border:#2e2e2e; --border-2:#3d3d3d;
+    --podman:#a6a6a6; --podman-soft:#262626;
+    --openshift:#ff5f57; --openshift-soft:#3a1413;
+    --ok:#5bbd51; --ok-soft:#16240f;
+    --warn:#e0b03e; --warn-soft:#2b2410;
+    --code-bg:#0a0a0a; --code-ink:#ececec; --code-dim:#8a8a8a; --code-line:#262626;
+    --link:#ff6b64;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.7);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0f0f0f; --surface:#1a1a1a; --surface-2:#242424; --surface-3:#2f2f2f;
+    --ink:#f0f0f0; --ink-2:#b8b8b8; --ink-3:#8a8a8a;
+    --border:#2e2e2e; --border-2:#3d3d3d;
+    --podman:#a6a6a6; --podman-soft:#262626;
+    --openshift:#ff5f57; --openshift-soft:#3a1413;
+    --ok:#5bbd51; --ok-soft:#16240f;
+    --warn:#e0b03e; --warn-soft:#2b2410;
+    --code-bg:#0a0a0a; --code-ink:#ececec; --code-dim:#8a8a8a; --code-line:#262626;
+    --link:#ff6b64;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.7);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Red Hat Text",system-ui,-apple-system,sans-serif;
+    font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--link);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:0;max-width:1180px;margin:0 auto}
+
+  /* ---- sidebar ---- */
+  .side{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:26px 20px 32px;border-right:1px solid var(--border)}
+  .brandmark{display:flex;align-items:center;gap:9px;margin-bottom:22px}
+  .brandmark .dot{width:11px;height:11px;border-radius:50%;background:var(--podman);
+    box-shadow:14px 0 0 var(--openshift)}
+  .brandmark span{font-family:"Red Hat Display";font-weight:700;font-size:.82rem;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);padding-left:14px}
+  nav.toc{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  nav.toc a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;
+    color:var(--ink-2);font-size:.9rem;font-weight:500;line-height:1.3}
+  nav.toc a:hover{background:var(--surface-2);text-decoration:none;color:var(--ink)}
+  nav.toc a.active{background:var(--surface-2);color:var(--ink)}
+  nav.toc a .n{font-family:"Red Hat Mono";font-size:.7rem;color:var(--ink-3);
+    width:20px;flex:none;text-align:right}
+  nav.toc a.pod.active{box-shadow:inset 3px 0 0 var(--podman)}
+  nav.toc a.ocp.active{box-shadow:inset 3px 0 0 var(--openshift)}
+  .progress{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+  .progress .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--ink-3);font-weight:700;display:flex;justify-content:space-between}
+  .bar{height:6px;border-radius:99px;background:var(--surface-3);margin-top:9px;overflow:hidden}
+  .bar>i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,var(--podman),var(--openshift));transition:width .35s ease}
+
+  /* ---- main ---- */
+  main{padding:34px clamp(20px,4vw,56px) 90px;min-width:0}
+  .hero{margin-bottom:30px}
+  .eyebrow{font-family:"Red Hat Mono";font-size:.76rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-3);font-weight:500}
+  h1{font-family:"Red Hat Display";font-weight:900;font-size:clamp(2rem,4.6vw,3rem);
+    line-height:1.02;letter-spacing:-.02em;margin:.35em 0 .28em;text-wrap:balance;
+    background:linear-gradient(100deg,var(--ink),var(--openshift));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:1.12rem;color:var(--ink-2);max-width:60ch;margin:0}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:99px;
+    background:var(--surface);border:1px solid var(--border);font-size:.82rem;
+    font-weight:500;color:var(--ink-2)}
+  .chip b{color:var(--ink);font-weight:700}
+  .chip .sq{width:8px;height:8px;border-radius:2px}
+
+  h2{font-family:"Red Hat Display";font-weight:700;font-size:1.66rem;letter-spacing:-.01em;
+    margin:0 0 6px;text-wrap:balance}
+  h3{font-family:"Red Hat Display";font-weight:700;font-size:1.12rem;margin:0 0 4px}
+  p{margin:.55em 0}
+  .muted{color:var(--ink-2)}
+  section.band{margin-top:38px;scroll-margin-top:16px}
+
+  .secthead{display:flex;align-items:baseline;gap:14px;padding-bottom:10px;
+    border-bottom:2px solid var(--border);margin-bottom:20px}
+  .secthead .tag{font-family:"Red Hat Mono";font-size:.74rem;font-weight:700;
+    text-transform:uppercase;letter-spacing:.1em;padding:4px 9px;border-radius:6px;flex:none}
+  .secthead .clock{margin-left:auto;font-size:.82rem;color:var(--ink-3);
+    font-family:"Red Hat Mono";white-space:nowrap;align-self:center}
+  .pod .tag{background:var(--podman-soft);color:var(--podman)}
+  .ocp .tag{background:var(--openshift-soft);color:var(--openshift)}
+
+  /* ---- config panel ---- */
+  .config{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:22px 22px 20px;margin:6px 0 8px;position:relative;overflow:hidden}
+  .config::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;
+    background:linear-gradient(var(--podman),var(--openshift))}
+  .config h3{display:flex;align-items:center;gap:9px;font-size:1.05rem;margin-bottom:3px}
+  .config .sub{color:var(--ink-2);font-size:.92rem;margin:0 0 16px}
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:.78rem;font-weight:700;letter-spacing:.03em;
+    text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+  .field label .hint{text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink-3)}
+  .field input,.field textarea{width:100%;font-family:"Red Hat Mono";font-size:.86rem;
+    color:var(--ink);background:var(--surface-2);border:1px solid var(--border-2);
+    border-radius:9px;padding:10px 12px;resize:vertical;line-height:1.5}
+  .field textarea{min-height:44px}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--podman);
+    box-shadow:0 0 0 3px var(--podman-soft)}
+  .cfg-row{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .cfg-status{font-size:.82rem;color:var(--ink-2);display:flex;align-items:center;gap:7px}
+  .cfg-status .ic{width:16px;height:16px;border-radius:50%;background:var(--surface-3);flex:none;
+    display:grid;place-items:center;font-size:.7rem;color:var(--ink-3)}
+  .cfg-status.ok .ic{background:var(--ok-soft);color:var(--ok)}
+  .btn-ghost{margin-left:auto;font-size:.8rem;font-weight:600;color:var(--ink-2);
+    background:none;border:1px solid var(--border-2);border-radius:8px;padding:6px 12px;cursor:pointer}
+  .btn-ghost:hover{background:var(--surface-2);color:var(--ink)}
+
+  /* ---- steps ---- */
+  .step{display:grid;grid-template-columns:34px 1fr;gap:16px;margin:22px 0;
+    scroll-margin-top:16px}
+  .step .num{font-family:"Red Hat Display";font-weight:900;font-size:1.05rem;
+    width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+    background:var(--surface-2);color:var(--ink-2);border:1px solid var(--border);
+    user-select:none;transition:all .2s}
+  .pod .step .num{color:var(--podman)}
+  .ocp .step .num{color:var(--openshift)}
+  .step.done .num{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .step.done .num::after{content:"✓"}
+  .step.done .num .d{display:none}
+  .step .body{min-width:0}
+  .step .body>h3{margin-top:3px}
+  .why{color:var(--ink-2);font-size:.95rem;margin:.5em 0 0}
+  .why b{color:var(--ink);font-weight:600}
+  .done-row{margin-top:12px}
+  .done-toggle{display:inline-flex;align-items:center;gap:8px;font-size:.82rem;
+    color:var(--ink-3);cursor:pointer;user-select:none;font-weight:500}
+  .done-toggle input{appearance:none;width:16px;height:16px;border-radius:5px;
+    border:1.5px solid var(--border-2);background:var(--surface);cursor:pointer;position:relative;margin:0}
+  .done-toggle input:checked{background:var(--ok);border-color:var(--ok)}
+  .done-toggle input:checked::after{content:"✓";position:absolute;inset:0;color:#fff;
+    font-size:.7rem;display:grid;place-items:center}
+  .done-toggle input:focus-visible{outline:2px solid var(--podman);outline-offset:2px}
+
+  /* ---- command block ---- */
+  .cmd{background:var(--code-bg);border-radius:11px;margin:12px 0;position:relative;
+    border:1px solid var(--code-line);overflow:hidden}
+  .cmd .top{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 14px;
+    border-bottom:1px solid var(--code-line)}
+  .cmd .dots{display:flex;gap:6px}
+  .cmd .dots i{width:10px;height:10px;border-radius:50%;background:var(--code-line)}
+  .cmd .ttl{font-family:"Red Hat Mono";font-size:.72rem;color:var(--code-dim);
+    letter-spacing:.02em}
+  .cmd .copy{margin-left:auto;font-family:"Red Hat Text";font-size:.76rem;font-weight:600;
+    color:var(--code-dim);background:transparent;border:1px solid var(--code-line);
+    border-radius:7px;padding:4px 11px;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .cmd .copy:hover{color:var(--code-ink);border-color:var(--code-dim)}
+  .cmd .copy.copied{color:var(--ok);border-color:var(--ok)}
+  .cmd pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:"Red Hat Mono";
+    font-size:.855rem;line-height:1.7;color:var(--code-ink)}
+  .cmd code{font-family:inherit}
+  .cmd .cmt{color:var(--code-dim)}
+  .var{color:#f5c451;font-weight:500;border-bottom:1px dotted rgba(245,196,81,.5);
+    padding-bottom:1px}
+  .var.empty{color:#ff6b64;border-bottom-color:rgba(255,107,100,.6);font-style:italic}
+
+  /* ---- callouts ---- */
+  .callout{border-radius:var(--radius);padding:16px 18px;margin:16px 0;
+    border:1px solid var(--border-2);background:var(--surface);display:flex;gap:13px}
+  .callout .k{font-family:"Red Hat Display";font-weight:900;font-size:.9rem;flex:none;
+    width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+  .callout .txt{min-width:0}
+  .callout .txt strong{font-weight:700}
+  .callout.tip{background:var(--warn-soft);border-color:transparent}
+  .callout.tip .k{background:var(--warn);color:#fff}
+  .callout.tip .txt strong{color:var(--warn)}
+  .callout.check{background:var(--ok-soft);border-color:transparent}
+  .callout.check .k{background:var(--ok);color:#fff}
+  .callout.check .txt strong{color:var(--ok)}
+
+  /* ---- transition bridge ---- */
+  .bridge{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:26px;margin-top:8px;position:relative;overflow:hidden}
+  .bridge-flow{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+  .env{display:flex;align-items:center;gap:9px;padding:8px 14px;border-radius:10px;
+    font-weight:600;font-size:.9rem;font-family:"Red Hat Display"}
+  .env.a{background:var(--podman-soft);color:var(--podman)}
+  .env.b{background:var(--openshift-soft);color:var(--openshift)}
+  .env .sq{width:9px;height:9px;border-radius:2px}
+  .bridge-flow .arrow{flex:1;min-width:60px;height:2px;position:relative;
+    background:linear-gradient(90deg,var(--podman),var(--openshift))}
+  .bridge-flow .arrow::after{content:"";position:absolute;right:-1px;top:-4px;
+    border:5px solid transparent;border-left-color:var(--openshift)}
+  .bridge-flow .gap-lbl{position:absolute;left:50%;top:-24px;transform:translateX(-50%);
+    font-family:"Red Hat Mono";font-size:.68rem;color:var(--ink-3);white-space:nowrap}
+
+  /* ---- figure placeholders ---- */
+  figure{margin:16px 0;border:1.5px dashed var(--border-2);border-radius:12px;
+    background:var(--surface-2);padding:26px;text-align:center;color:var(--ink-3)}
+  figure .ico{font-size:1.4rem;opacity:.6}
+  figure figcaption{font-size:.82rem;margin-top:6px;font-family:"Red Hat Mono"}
+
+  /* ---- takeaways + table ---- */
+  .takeaways{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:18px 0}
+  .tk{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .tk h4{font-family:"Red Hat Display";font-weight:700;font-size:1rem;margin:0 0 5px}
+  .tk p{margin:0;font-size:.9rem;color:var(--ink-2)}
+  .tbl-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--border);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:440px}
+  th,td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--border)}
+  thead th{font-family:"Red Hat Display";font-size:.76rem;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--ink-3)}
+  thead th.pod{color:var(--podman)} thead th.ocp{color:var(--openshift)}
+  tbody tr:last-child td{border-bottom:none}
+  td code{font-family:"Red Hat Mono";font-size:.83rem;background:var(--surface-2);
+    padding:2px 6px;border-radius:5px}
+  .links{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
+  .lk{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border-radius:11px;
+    background:var(--surface);border:1px solid var(--border);flex:1;min-width:190px}
+  .lk .t{font-weight:700;font-family:"Red Hat Display"}
+  .lk .d{font-size:.82rem;color:var(--ink-2)}
+
+  footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--border);
+    color:var(--ink-3);font-size:.84rem;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+  .theme-btn{position:fixed;top:14px;right:14px;z-index:20;width:38px;height:38px;border-radius:10px;
+    background:var(--surface);border:1px solid var(--border-2);cursor:pointer;color:var(--ink-2);
+    box-shadow:var(--shadow);display:grid;place-items:center;font-size:1rem}
+  .theme-btn:hover{color:var(--ink)}
+
+  /* ---- lab launcher ---- */
+  .launch{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:20px 22px;margin:6px 0 24px;position:relative;overflow:hidden}
+  .launch::before{content:"";position:absolute;inset:0 auto 0 0;width:4px}
+  .pod-launch::before{background:var(--podman)}
+  .ocp-launch::before{background:var(--openshift)}
+  .launch h3{font-size:1.05rem;display:flex;align-items:center;gap:8px;margin:0 0 2px}
+  .launch .small{font-size:.88rem;margin:0 0 14px;max-width:62ch}
+  .pw-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .pw-row label{font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-3)}
+  .pw-row input{flex:1;min-width:150px;font-family:"Red Hat Mono";font-size:.85rem;color:var(--ink);
+    background:var(--surface-2);border:1px solid var(--border-2);border-radius:8px;padding:8px 11px}
+  .pw-row input:focus{outline:none;border-color:var(--openshift);box-shadow:0 0 0 3px var(--openshift-soft)}
+  .pw-copy{font-size:.8rem;font-weight:600;color:var(--ink-2);background:var(--surface-2);
+    border:1px solid var(--border-2);border-radius:8px;padding:8px 13px;cursor:pointer}
+  .pw-copy:hover{background:var(--surface-3);color:var(--ink)}
+  .launch-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .lbtn{display:inline-flex;align-items:center;gap:8px;font-family:"Red Hat Display";font-weight:700;
+    font-size:.92rem;padding:11px 18px;border-radius:9px;cursor:pointer;text-decoration:none;
+    border:1px solid var(--border-2);background:var(--surface-2);color:var(--ink);transition:all .15s}
+  .lbtn:hover{text-decoration:none;border-color:var(--ink-3)}
+  .lbtn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+  .lbtn.primary:hover{filter:brightness(1.15)}
+  .ocp-launch .lbtn.primary{background:var(--openshift);border-color:var(--openshift);color:#fff}
+  .lbtn[aria-disabled="true"]{opacity:.4;pointer-events:none}
+  .launch-note{font-size:.82rem;color:var(--ink-3);margin-top:11px;font-family:"Red Hat Mono"}
+  .launch-note.ok{color:var(--ok)}
+
+  /* ---- responsive ---- */
+  @media (max-width:860px){
+    .wrap{grid-template-columns:1fr}
+    .side{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);
+      display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px;padding:14px 20px}
+    .brandmark{margin-bottom:0}
+    nav.toc{flex-direction:row;flex-wrap:wrap;gap:2px;margin:0}
+    nav.toc a .n{display:none}
+    .progress{margin:0;padding:0;border:none;min-width:150px;margin-left:auto}
+    .side .progress .bar{margin-top:5px}
+  }
+  :focus-visible{outline:2px solid var(--podman);outline-offset:2px}
+</style>
+
+<button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+
+<div class="wrap">
+  <aside class="side">
+    <div class="brandmark"><span>Podman → OpenShift</span></div>
+    <nav class="toc" id="toc">
+      <a href="#overview"><span class="n">00</span> Overview</a>
+      <a href="#setup"><span class="n">·</span> Your lab details</a>
+      <a href="#podman" class="pod"><span class="n">A</span> Podman · local</a>
+      <a href="#transition"><span class="n">↔</span> The transition</a>
+      <a href="#openshift" class="ocp"><span class="n">B</span> OpenShift · cluster</a>
+      <a href="#takeaways"><span class="n">★</span> Takeaways</a>
+    </nav>
+    <div class="progress">
+      <div class="lbl"><span>Progress</span><span id="pctLbl">0%</span></div>
+      <div class="bar"><i id="barFill"></i></div>
+    </div>
+  </aside>
+
+  <main>
+    <header class="hero" id="overview">
+      <div class="eyebrow">Hands-on lab · ~20 minutes</div>
+      <h1>From your laptop to a cluster</h1>
+      <p class="lede">Build and run a container locally with <b>Podman</b>, then deploy the very same
+        app to <b>OpenShift</b> and scale it — and see exactly what changes when you cross from one to the other.</p>
+      <div class="meta">
+        <span class="chip"><span class="sq" style="background:var(--podman)"></span> Lab A · <b>Podman</b></span>
+        <span class="chip"><span class="sq" style="background:var(--openshift)"></span> Lab B · <b>OpenShift</b></span>
+        <span class="chip">⏱ <b>~20 min</b> hands-on</span>
+        <span class="chip">🎯 Pod running &amp; scaling</span>
+      </div>
+    </header>
+
+    <p class="muted">The app is a small Flask page that shows a hit counter, backed by <b>Redis</b>.
+      The web part is <b>stateless</b>; Redis holds the count. That split is the whole point — it's why
+      the web tier can scale, and why it needs a backing service alongside it.</p>
+
+    <!-- CONFIG -->
+    <section id="setup">
+      <div class="config">
+        <h3><span class="sq" style="width:10px;height:10px;border-radius:3px;background:linear-gradient(var(--podman),var(--openshift))"></span> Set up your lab once</h3>
+        <p class="sub">Paste your own lab details below and every command on this page fills in automatically — then just hit <b>Copy</b>.</p>
+        <div class="field">
+          <label for="in-login">Your OpenShift login command <span class="hint">— from the console: top-right menu → “Copy login command”</span></label>
+          <textarea id="in-login" data-key="LOGIN" placeholder="oc login --token=sha256~xxxxxxxx --server=https://api.your-cluster:6443"></textarea>
+        </div>
+        <div class="field">
+          <label for="in-repo">App Git repo URL <span class="hint">— defaults to the workshop repo; change it if you forked</span></label>
+          <input id="in-repo" data-key="REPO" value="https://github.com/wlptn/podman-openshift-workshop">
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-status" id="cfgStatus"><span class="ic">·</span> <span id="cfgText">Using default values</span></span>
+          <button class="btn-ghost" id="resetBtn">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PART A : PODMAN -->
+    <section class="band pod" id="podman">
+      <div class="secthead">
+        <span class="tag">Lab A</span>
+        <h2>Build &amp; run it locally with Podman</h2>
+        <span class="clock">~10 min</span>
+      </div>
+      <p class="muted">Turn source code into an <b>image</b>, run it as a <b>container</b>, then bring up the
+        full app — web + redis — with a single command.</p>
+
+      <div class="launch pod-launch">
+        <h3>▶ Launch your Podman lab</h3>
+        <p class="muted small">From your lab access page, paste your host below — the buttons open your
+          <b>terminal &amp; instructions</b> and the <b>VNC desktop</b> in a new tab. Keep them side-by-side with this guide.</p>
+        <div class="field">
+          <label for="in-podhost">Podman lab host <span class="hint">— e.g. rhel9.cpk2x.sandbox748.opentlc.com</span></label>
+          <input id="in-podhost" value="rhel9.cpk2x.sandbox748.opentlc.com" placeholder="rhel9.xxxx.sandboxNNN.opentlc.com">
+        </div>
+        <div class="pw-row">
+          <label for="in-podpw">noVNC password</label>
+          <input id="in-podpw" placeholder="paste it here to keep it handy for the desktop">
+          <button class="pw-copy" data-copy="in-podpw" type="button">Copy</button>
+        </div>
+        <div class="launch-btns">
+          <a class="lbtn primary" id="pod-term" target="_blank" rel="noopener" aria-disabled="true">Open terminal &amp; instructions ↗</a>
+          <a class="lbtn" id="pod-vnc" target="_blank" rel="noopener" aria-disabled="true">Open desktop · VNC ↗</a>
+        </div>
+        <div class="launch-note" id="pod-note">Enter your lab host above to enable the buttons.</div>
+      </div>
+
+      <div class="step" data-step="a1">
+        <div class="num"><span class="d">1</span></div>
+        <div class="body">
+          <h3>Build an image</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman build -t sandbox-app .</code></pre></div>
+          <p class="why">An <b>image</b> is your app, its dependencies, and how to start it — frozen into one portable artifact. The recipe is the <code>Dockerfile</code>.</p>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman images  <span class="cmt"># see the image you just made</span></code></pre></div>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="a1"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="a2">
+        <div class="num"><span class="d">2</span></div>
+        <div class="body">
+          <h3>Run a container from that image</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman run -d -p 8080:5000 --name web sandbox-app
+podman ps  <span class="cmt"># your image is now a running container</span></code></pre></div>
+          <p class="why">A <b>container</b> is a running instance of an image. <code>-d</code> runs it in the background; <code>-p 8080:5000</code> maps your laptop's port 8080 to the app's port 5000.</p>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman logs web</code></pre></div>
+          <p class="why">You'll see it complain it can't reach Redis — this app is <b>two</b> pieces, and one container is only one of them. That's our cue for Compose.</p>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman rm -f web  <span class="cmt"># clear it before the full-stack run</span></code></pre></div>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="a2"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="a3">
+        <div class="num"><span class="d">3</span></div>
+        <div class="body">
+          <h3>Run the whole app with Compose</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman compose up -d</code></pre></div>
+          <p class="why"><code>docker-compose.yml</code> describes <b>both</b> services and wires them on one network. One command brings up the complete app.</p>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman ps                 <span class="cmt"># two containers now: web and redis</span>
+curl localhost:8000       <span class="cmt"># the page renders; refresh and the counter climbs</span></code></pre></div>
+          <p class="why">Open <b>http://localhost:8000</b> in the browser and refresh a few times.</p>
+          <figure><div class="ico">🖼</div><figcaption>screenshot: Podman Desktop → Containers view, web + redis running</figcaption></figure>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="a3"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="a4">
+        <div class="num"><span class="d">4</span></div>
+        <div class="body">
+          <h3>Tear it down</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>podman compose down</code></pre></div>
+          <div class="callout check"><div class="k">✓</div><div class="txt"><strong>Checkpoint.</strong> You built an image, ran a container, and ran a multi-service app — all on your own machine.</div></div>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="a4"> Mark done</label></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRANSITION -->
+    <section class="band" id="transition">
+      <div class="secthead">
+        <span class="tag" style="background:var(--surface-3);color:var(--ink-2)">Bridge</span>
+        <h2>How does this reach a real cluster?</h2>
+        <span class="clock">~1 min · talk</span>
+      </div>
+      <div class="bridge">
+        <div class="bridge-flow">
+          <span class="env a"><span class="sq" style="background:var(--podman)"></span> Your laptop</span>
+          <span class="arrow"><span class="gap-lbl">the image can't cross by itself</span></span>
+          <span class="env b"><span class="sq" style="background:var(--openshift)"></span> OpenShift cluster</span>
+        </div>
+        <p>You just built an image <b>on this laptop</b>. The OpenShift lab is a <b>completely separate
+          environment</b> — it cannot see that image. In the real world you bridge that gap by putting the
+          image somewhere both sides can reach: you <b>push it to a shared registry</b> (Quay, an internal
+          registry…), usually from a <b>CI/CD pipeline</b> that builds it once and promotes it.</p>
+        <p class="muted">For this workshop we use a shortcut: <b>OpenShift builds the image itself, from the
+          app's source code.</b> Great for learning — but that's the shortcut. In production you'd build once
+          in a pipeline and ship a versioned image, not rebuild inside every cluster.</p>
+      </div>
+    </section>
+
+    <!-- PART B : OPENSHIFT -->
+    <section class="band ocp" id="openshift">
+      <div class="secthead">
+        <span class="tag">Lab B</span>
+        <h2>Deploy the same app to OpenShift</h2>
+        <span class="clock">~9 min</span>
+      </div>
+      <p class="muted">Get the app running as <b>pods</b>, give it a public URL, and scale it.</p>
+
+      <div class="step" data-step="b1">
+        <div class="num"><span class="d">1</span></div>
+        <div class="body">
+          <h3>Log in to your cluster</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">your login command</span><button class="copy">Copy</button></div>
+            <pre><code><span class="var empty" data-var="LOGIN" data-ph="‹paste your oc login command in the panel above›">‹paste your oc login command in the panel above›</span>
+oc whoami
+oc project  <span class="cmt"># your personal namespace</span></code></pre></div>
+          <p class="why">The login command comes from the OpenShift console — <b>top-right menu → Copy login command</b>. Paste it into the panel above and it drops in here.</p>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="b1"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="b2">
+        <div class="num"><span class="d">2</span></div>
+        <div class="body">
+          <h3>Deploy Redis first (the backing service)</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc new-app redis:alpine --name=redis</code></pre></div>
+          <p class="why">OpenShift pulls the public Redis image and creates a Deployment + Service. <b>Redis first</b>, so the <code>redis</code> name exists the moment web starts up.</p>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="b2"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="b3">
+        <div class="num"><span class="d">3</span></div>
+        <div class="body">
+          <h3>Let OpenShift build &amp; deploy the web app from source</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc new-app <span class="var" data-var="REPO">https://github.com/wlptn/podman-openshift-workshop</span> \
+  --name=web --strategy=docker</code></pre></div>
+          <p class="why">OpenShift clones the repo, builds the image <b>in the cluster</b> from the Dockerfile, stores it in the internal registry, and rolls out a Deployment + Service — no laptop image needed.</p>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc logs -f bc/web  <span class="cmt"># watch the build; Ctrl-C after "Push successful"</span></code></pre></div>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="b3"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="b4">
+        <div class="num"><span class="d">4</span></div>
+        <div class="body">
+          <h3>See your app running as a pod ⭐</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc get pods</code></pre></div>
+          <p class="why"><code>web-…</code> and <code>redis-…</code> both <b>Running</b>. This is the moment: your app is a pod on a real cluster.</p>
+          <figure><div class="ico">🖼</div><figcaption>screenshot: OpenShift console → Topology, web + redis</figcaption></figure>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="b4"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="b5">
+        <div class="num"><span class="d">5</span></div>
+        <div class="body">
+          <h3>Give it a public URL</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc create route edge web --service=web --insecure-policy=Redirect
+oc get route web</code></pre></div>
+          <p class="why">A <b>Route</b> is the public front door. <code>edge</code> adds HTTPS at the router; <code>Redirect</code> sends http → https. Open the URL in a browser.</p>
+          <div class="callout tip"><div class="k">!</div><div class="txt"><strong>If a route ever shows “Application is not available”</strong> — it's the Route/Service layer, not your code. Usually http-vs-https or a port mismatch, not a crash.</div></div>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="b5"> Mark done</label></div>
+        </div>
+      </div>
+
+      <div class="step" data-step="b6">
+        <div class="num"><span class="d">6</span></div>
+        <div class="body">
+          <h3>Scale up and down ⭐</h3>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc scale deployment/web --replicas=3
+oc get pods -w   <span class="cmt"># watch three web pods appear; Ctrl-C to stop</span></code></pre></div>
+          <p class="why">Refresh the app a few times — the counter keeps climbing correctly across all 3 pods, <b>because they share the one Redis.</b> That's the stateless-web idea made visible.</p>
+          <div class="cmd"><div class="top"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">terminal</span><button class="copy">Copy</button></div>
+            <pre><code>oc scale deployment/web --replicas=1</code></pre></div>
+          <p class="why">You <b>declare</b> the count you want; OpenShift makes reality match. Describe the end state — the platform keeps it true.</p>
+          <div class="callout check"><div class="k">✓</div><div class="txt"><strong>Checkpoint.</strong> Same app, now on a real cluster — deployed, exposed over HTTPS, and scaled.</div></div>
+          <div class="done-row"><label class="done-toggle"><input type="checkbox" data-done="b6"> Mark done</label></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAKEAWAYS -->
+    <section class="band" id="takeaways">
+      <div class="secthead">
+        <span class="tag" style="background:var(--surface-3);color:var(--ink-2)">Wrap-up</span>
+        <h2>Why this matters</h2>
+      </div>
+      <div class="takeaways">
+        <div class="tk"><h4>Same image, anywhere</h4><p>Build once, run on a laptop or a cluster. No “works on my machine.”</p></div>
+        <div class="tk"><h4>Small, independent pieces</h4><p>A stateless web tier plus a shared backing service is what lets you scale safely.</p></div>
+        <div class="tk"><h4>Declarative platform</h4><p>You state the desired end state; OpenShift keeps it true — restarts, scaling, rollouts.</p></div>
+      </div>
+
+      <h3 style="margin-top:26px">Try it yourself at home</h3>
+      <div class="links">
+        <a class="lk" href="https://podman-desktop.io" target="_blank" rel="noopener"><span class="t">Podman Desktop ↗</span><span class="d">Build &amp; run locally, free</span></a>
+        <a class="lk" href="https://developers.redhat.com/developer-sandbox" target="_blank" rel="noopener"><span class="t">OpenShift Developer Sandbox ↗</span><span class="d">A free hosted cluster — the Lab B commands work as-is</span></a>
+        <a class="lk" href="https://developers.redhat.com/products/openshift-local/overview" target="_blank" rel="noopener"><span class="t">OpenShift Local ↗</span><span class="d">Run single-node OpenShift on your own machine</span></a>
+      </div>
+
+      <h3 style="margin-top:26px">Command cheat-sheet</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th class="pod">Podman · local</th><th class="ocp">OpenShift · cluster</th></tr></thead>
+          <tbody>
+            <tr><td><code>podman build -t app .</code></td><td><code>oc new-app &lt;git-url&gt; --strategy=docker</code></td></tr>
+            <tr><td><code>podman run -d -p 8080:5000 app</code></td><td><code>oc get pods</code></td></tr>
+            <tr><td><code>podman compose up -d</code></td><td><code>oc create route edge web --service=web</code></td></tr>
+            <tr><td><code>podman ps</code> / <code>podman logs</code></td><td><code>oc scale deployment/web --replicas=3</code></td></tr>
+            <tr><td><code>podman compose down</code></td><td><code>oc delete all -l app=web</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>Podman → OpenShift hands-on lab</span>
+      <span>Paste your lab details up top — the page remembers them on this device.</span>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var store = {
+    get:function(k){ try{return localStorage.getItem(k);}catch(e){return null;} },
+    set:function(k,v){ try{localStorage.setItem(k,v);}catch(e){} },
+    del:function(k){ try{localStorage.removeItem(k);}catch(e){} }
+  };
+  var KEYS = ["LOGIN","REPO"];
+  var inputs = {
+    LOGIN: document.getElementById("in-login"),
+    REPO:  document.getElementById("in-repo")
+  };
+  var defaults = { LOGIN:"", REPO: inputs.REPO.value };
+
+  function applyVar(name){
+    var val = inputs[name].value.trim();
+    document.querySelectorAll('.var[data-var="'+name+'"]').forEach(function(el){
+      if(val){ el.textContent = val; el.classList.remove("empty"); }
+      else{ el.textContent = el.getAttribute("data-ph") || defaults[name] || ""; el.classList.toggle("empty", !!el.getAttribute("data-ph")); }
+    });
+  }
+  function refreshStatus(){
+    var custom = KEYS.some(function(k){ return inputs[k].value.trim() !== (defaults[k]||"").trim(); });
+    var s = document.getElementById("cfgStatus"), t = document.getElementById("cfgText");
+    if(custom){ s.classList.add("ok"); s.querySelector(".ic").textContent="✓"; t.textContent="Your lab details are set — commands are personalized"; }
+    else{ s.classList.remove("ok"); s.querySelector(".ic").textContent="·"; t.textContent="Using default values"; }
+  }
+  KEYS.forEach(function(k){
+    var saved = store.get("lab_"+k);
+    if(saved!==null) inputs[k].value = saved;
+    applyVar(k);
+    inputs[k].addEventListener("input", function(){ store.set("lab_"+k, inputs[k].value); applyVar(k); refreshStatus(); });
+  });
+  refreshStatus();
+
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    KEYS.forEach(function(k){ inputs[k].value = defaults[k]||""; store.del("lab_"+k); applyVar(k); });
+    refreshStatus();
+  });
+
+  // --- lab launcher (Podman) ---
+  var podhost = document.getElementById("in-podhost");
+  if(podhost){
+    var savedH = store.get("lab_PODHOST"); if(savedH!==null) podhost.value = savedH;
+    var podpw = document.getElementById("in-podpw");
+    if(podpw){ var sp = store.get("lab_PODPW"); if(sp!==null) podpw.value = sp;
+      podpw.addEventListener("input", function(){ store.set("lab_PODPW", podpw.value); }); }
+    var trimHost = function(v){ return v.trim().replace(/^https?:\/\//,"").replace(/\/.*$/,"").replace(/:.*$/,""); };
+    var updatePod = function(){
+      var h = trimHost(podhost.value);
+      var term=document.getElementById("pod-term"), vnc=document.getElementById("pod-vnc"), note=document.getElementById("pod-note");
+      if(h){
+        term.href="https://"+h+"/showroom/";
+        vnc.href="https://"+h+":6080/vnc.html?autoconnect=true&resize=remote";
+        term.setAttribute("aria-disabled","false"); vnc.setAttribute("aria-disabled","false");
+        note.textContent="Ready — both open "+h+" in a new tab."; note.classList.add("ok");
+      }else{
+        term.removeAttribute("href"); vnc.removeAttribute("href");
+        term.setAttribute("aria-disabled","true"); vnc.setAttribute("aria-disabled","true");
+        note.textContent="Enter your lab host above to enable the buttons."; note.classList.remove("ok");
+      }
+    };
+    podhost.addEventListener("input", function(){ store.set("lab_PODHOST", podhost.value); updatePod(); });
+    updatePod();
+  }
+
+  // password copy chips
+  document.querySelectorAll("[data-copy]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var el=document.getElementById(btn.getAttribute("data-copy")); if(!el) return;
+      var v=el.value||""; var o=btn.textContent;
+      var ok=function(){ btn.textContent="Copied ✓"; setTimeout(function(){btn.textContent=o;},1300); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v).then(ok,function(){fallback(v);ok();}); } else { fallback(v); ok(); }
+    });
+  });
+
+  // copy buttons
+  document.querySelectorAll(".cmd").forEach(function(block){
+    var btn = block.querySelector(".copy"), pre = block.querySelector("pre");
+    if(!btn||!pre) return;
+    btn.addEventListener("click", function(){
+      var text = pre.innerText.replace(/ /g," ");
+      var done = function(){ var o=btn.textContent; btn.textContent="Copied ✓"; btn.classList.add("copied");
+        setTimeout(function(){ btn.textContent=o; btn.classList.remove("copied"); },1400); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done,function(){fallback(text);done();}); }
+      else{ fallback(text); done(); }
+    });
+  });
+  function fallback(text){ var ta=document.createElement("textarea"); ta.value=text;
+    ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
+    try{document.execCommand("copy");}catch(e){} document.body.removeChild(ta); }
+
+  // progress
+  var toggles = Array.prototype.slice.call(document.querySelectorAll("[data-done]"));
+  function recompute(){
+    var n = toggles.filter(function(t){return t.checked;}).length;
+    var pct = Math.round(n/toggles.length*100);
+    document.getElementById("barFill").style.width = pct+"%";
+    document.getElementById("pctLbl").textContent = pct+"%";
+  }
+  toggles.forEach(function(t){
+    var id = t.getAttribute("data-done");
+    if(store.get("done_"+id)==="1"){ t.checked=true; }
+    var step = document.querySelector('.step[data-step="'+id+'"]');
+    function sync(){ if(step) step.classList.toggle("done", t.checked); store.set("done_"+id, t.checked?"1":"0"); recompute(); }
+    t.addEventListener("change", sync); sync();
+  });
+  recompute();
+
+  // active nav on scroll
+  var links = Array.prototype.slice.call(document.querySelectorAll("#toc a"));
+  var map = {}; links.forEach(function(a){ map[a.getAttribute("href").slice(1)] = a; });
+  var ids = Object.keys(map);
+  if("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){ links.forEach(function(l){l.classList.remove("active");});
+          if(map[e.target.id]) map[e.target.id].classList.add("active"); }
+      });
+    },{rootMargin:"-20% 0px -70% 0px"});
+    ids.forEach(function(id){ var el=document.getElementById(id); if(el) io.observe(el); });
+  }
+
+  // theme toggle (cycles light/dark, overriding system)
+  var tb = document.getElementById("themeBtn");
+  var cur = store.get("theme");
+  if(cur) document.documentElement.setAttribute("data-theme", cur);
+  tb.addEventListener("click", function(){
+    var isDark = document.documentElement.getAttribute("data-theme")==="dark"
+      || (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme:dark)").matches);
+    var next = isDark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next); store.set("theme", next);
+  });
+})();
+</script>
