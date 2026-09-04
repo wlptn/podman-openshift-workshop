@@ -35,10 +35,10 @@ artifact. The recipe is the `Dockerfile`.
 ### 2. Run a single container
 ```bash
 podman run -d -p 8080:5000 --name web sandbox-app
-podman logs web
 ```
-It starts, but can't reach Redis (`REDIS_HOST` defaults to `redis`, which doesn't
-exist yet). One container is only half the app — it needs its Redis companion.
+Open **http://localhost:8080** — the page loads, but shows **"Waiting for Redis..."**
+instead of a hit counter. That's the point: the web tier runs fine on its own, but
+one container is only half the app — the counter needs its Redis companion.
 ```bash
 podman rm -f web
 ```
