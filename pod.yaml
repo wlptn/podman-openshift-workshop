@@ -1,0 +1,23 @@
+# A Pod groups containers so they share one network namespace.
+# Run it with:  podman kube play pod.yaml
+# This is Kubernetes YAML — the same format OpenShift understands.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hitcounter
+  labels:
+    app: hitcounter
+spec:
+  containers:
+    - name: web
+      image: localhost/sandbox-app:latest   # the image you built with `podman build`
+      ports:
+        - containerPort: 5000
+          hostPort: 8080
+      env:
+        # Inside a pod, containers share the network, so Redis is on localhost
+        # (not a separate service name, the way Compose wires it).
+        - name: REDIS_HOST
+          value: "localhost"
+    - name: redis
+      image: docker.io/redis:alpine
