@@ -56,22 +56,27 @@ container finds Redis by the name `redis` (set via `REDIS_HOST` in
 podman compose down
 ```
 
-### 4. Run them as a pod
-Compose gives you two *separate* containers. A **pod** groups them so they share
-one network namespace — exactly how OpenShift will run them.
+### 4. Run it as a pod
+
+Remove the single container from Step 2 first, so it isn't holding port 8080:
+```bash
+podman rm -f web
+```
+
+Now create a **pod** from `pod.yaml`. This one command provisions **both**
+containers together — the web app *and* Redis — inside a single pod that shares
+one network:
 ```bash
 podman kube play pod.yaml
-podman pod ps         # one pod: hitcounter
-podman ps             # web and redis, both inside it
-curl localhost:8080
+podman pod ps        # one pod: hitcounter, with both containers inside
 ```
-Notice `pod.yaml` sets `REDIS_HOST=localhost`: inside a pod, containers share the
-network, so Redis is reachable on `localhost` rather than by a separate name.
 
-> `pod.yaml` is Kubernetes YAML — the same format OpenShift speaks. You've just
-> written your first Kubernetes manifest.
+Open **http://localhost:8080** — the counter works immediately, because
+containers in a pod share the network (Redis is on `localhost`, set by
+`REDIS_HOST` in `pod.yaml`). A pod is the exact unit OpenShift schedules, and
+`pod.yaml` is Kubernetes YAML — so you've just written your first manifest.
 ```bash
-podman kube down pod.yaml
+podman kube down pod.yaml   # stop the pod when you're done
 ```
 
 ---
