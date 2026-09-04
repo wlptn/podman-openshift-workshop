@@ -21,7 +21,11 @@
     <h3 class="text-4xl text-center font-semibold text-slate-50 pt-5 font-mono">time(s)</h3>
        
   {% else %}
-    <h1>Hello, World!</h1>
+    <h3 class="text-4xl text-center font-semibold text-slate-50 py-12 font-mono">Hello, World!</h3>
+    <div class="bg-white/90 mx-auto w-96 max-w-[90%] rounded-md shadow-lg p-6 text-center">
+      <p class="text-xl font-semibold text-purple-700 font-mono">Waiting for Redis...</p>
+      <p class="text-sm text-gray-500 mt-2">The page is up &mdash; the hit counter just needs its Redis companion. Start Redis and refresh.</p>
+    </div>
   {% endif %}
   </div>
 
