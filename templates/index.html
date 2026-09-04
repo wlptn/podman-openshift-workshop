@@ -22,9 +22,9 @@
        
   {% else %}
     <h3 class="text-4xl text-center font-semibold text-slate-50 py-12 font-mono">Hello, World!</h3>
-    <div class="bg-white/90 mx-auto w-96 max-w-[90%] rounded-md shadow-lg p-6 text-center">
-      <p class="text-xl font-semibold text-purple-700 font-mono">Waiting for Redis...</p>
-      <p class="text-sm text-gray-500 mt-2">The page is up &mdash; the hit counter just needs its Redis companion. Start Redis and refresh.</p>
+    <div style="max-width:34rem;margin:0 auto;background:#ffffff;border-radius:0.5rem;box-shadow:0 10px 20px -6px rgba(0,0,0,.35);padding:1.5rem 1.75rem;text-align:center">
+      <div style="font-family:monospace;font-size:1.35rem;font-weight:700;color:#b45309">Waiting for Redis...</div>
+      <div style="font-size:0.95rem;color:#475569;margin-top:0.5rem;line-height:1.5">The web page is running, but the hit counter needs its Redis companion. Start Redis &mdash; e.g. <code>podman compose up</code> &mdash; then refresh, and the counter will appear.</div>
     </div>
   {% endif %}
   </div>
