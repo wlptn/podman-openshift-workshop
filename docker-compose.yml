@@ -1,11 +1,16 @@
 services:
+  # Frontend: our Flask app, built from the Dockerfile in this folder
+  # and tagged "sandbox-app" (the same image you built by hand).
   web:
     build: .
+    image: sandbox-app
     ports:
       - "8000:5000"
     environment:
-      - REDIS_HOST=redis
+      - REDIS_HOST=redis      # reach the Redis service by its name
     depends_on:
       - redis
+
+  # Backing service: Redis, pulled from its small official Alpine image.
   redis:
     image: redis:alpine
